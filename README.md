@@ -1,4 +1,4 @@
-# Master OAuth2 Authorization Server
+# # OAuth-Custom | Master OAuth2 Authorization Server
 
 Authorization Server با **Spring Boot 2.3.0**، کاربران و scope در دیتابیس، صفحه انتخاب scope، کپچا، لاگین pluggable (محلی/وب‌سرویس)، و مدیریت/ابطال توکن.
 
@@ -140,4 +140,3 @@ curl -u api-client:password \
   http://localhost:8080/oauth/token
 
   http://localhost:8087/oauth/authorize?response_type=code&client_id=web-client&redirect_uri=http://localhost:8081/callback&scope=read%20write%20profile%20email&state=demo
-# OAuth-Custom
