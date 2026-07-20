@@ -1,0 +1,1062 @@
+openapi: 3.0.3
+info:
+  title: مستندات API سرور احراز هویت Master OAuth
+  description: |
+    وب‌سرویس‌های REST و OAuth2 برای Authorization Server.
+
+    ## احراز هویت
+    بیشتر مسیرهای `/api/**` به توکن Bearer از `/oauth/token` نیاز دارند.
+
+    ## جریان‌ها
+    - **authorization_code** — لاگین مرورگر + کپچا + انتخاب scope
+    - **password** — کلاینت‌های ماشینی (`api-client`)
+    - **refresh_token** / **client_credentials** — مطابق تنظیمات هر کلاینت
+
+    عملیات CRUD کاربران و Scope به دسترسی `write` نیاز دارد.
+  version: 1.0.0
+  contact:
+    name: Master OAuth
+x-logo:
+  url: https://cdn.redoc.ly/redoc/logo-mini.svg
+  altText: Master OAuth
+servers:
+  - url: http://localhost:8089
+    description: محیط توسعه محلی
+tags:
+  - name: عمومی
+    description: سلامت سرویس و کشف تنظیمات بدون توکن
+  - name: احرازهویت
+    description: حالت لاگین و بررسی اعتبارنامه‌ها
+  - name: OAuth2
+    description: endpointهای استاندارد صدور و تأیید توکن
+  - name: پروفایل
+    description: پروفایل و scopeهای کاربر جاری
+  - name: اسکوپ‌ها
+    description: مدیریت CRUD اسکوپ‌ها (خواندن عمومی؛ نوشتن با write)
+  - name: کاربران
+    description: مدیریت CRUD کاربران (نیاز به scope write)
+  - name: توکن‌ها
+    description: فهرست و ابطال توکن‌های JWT صادرشده
+  - name: رضایت‌نامه
+    description: API رضایت‌نامه مبتنی بر session در جریان authorization_code
+x-tagGroups:
+  - name: شروع کار
+    tags:
+      - عمومی
+      - احرازهویت
+      - OAuth2
+  - name: APIهای محافظت‌شده
+    tags:
+      - پروفایل
+      - اسکوپ‌ها
+      - کاربران
+      - توکن‌ها
+      - رضایت‌نامه
+paths:
+  /api/public/health:
+    get:
+      tags: [عمومی]
+      summary: بررسی سلامت سرویس
+      operationId: health
+      responses:
+        '200':
+          description: سرویس در دسترس است
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: UP
+                service: oauth-authorization-server
+
+  /api/public/auth-mode:
+    get:
+      tags: [عمومی]
+      summary: حالت لاگین و وضعیت کپچا
+      operationId: authMode
+      responses:
+        '200':
+          description: پیکربندی احراز هویت
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthModeResponse'
+
+  /api/scopes:
+    get:
+      tags: [اسکوپ‌ها, عمومی]
+      summary: فهرست اسکوپ‌ها
+      operationId: listScopes
+      parameters:
+        - name: activeOnly
+          in: query
+          description: فقط اسکوپ‌های فعال
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: لیست اسکوپ‌ها
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScopeEntity'
+    post:
+      tags: [اسکوپ‌ها]
+      summary: ایجاد اسکوپ
+      operationId: createScope
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScopeRequest'
+            example:
+              name: reports
+              displayName: گزارش‌ها
+              description: دسترسی به API گزارش‌گیری
+              active: true
+      responses:
+        '201':
+          description: ایجاد شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeEntity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: نیاز به scope با نام write
+        '409':
+          description: نام اسکوپ تکراری است
+
+  /api/scopes/{id}:
+    get:
+      tags: [اسکوپ‌ها, عمومی]
+      summary: دریافت اسکوپ با شناسه
+      operationId: getScope
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: جزئیات اسکوپ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeEntity'
+        '404':
+          description: یافت نشد
+    put:
+      tags: [اسکوپ‌ها]
+      summary: به‌روزرسانی اسکوپ
+      operationId: updateScope
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateScopeRequest'
+      responses:
+        '200':
+          description: به‌روزرسانی شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeEntity'
+        '403':
+          description: نیاز به scope با نام write
+        '404':
+          description: یافت نشد
+    delete:
+      tags: [اسکوپ‌ها]
+      summary: حذف اسکوپ
+      description: اسکوپ از همه کاربران نیز حذف می‌شود.
+      operationId: deleteScope
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: حذف شد
+        '403':
+          description: نیاز به scope با نام write
+        '404':
+          description: یافت نشد
+
+  /api/users:
+    get:
+      tags: [کاربران]
+      summary: فهرست کاربران
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: لیست کاربران
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserEntity'
+        '403':
+          description: نیاز به scope با نام write
+    post:
+      tags: [کاربران]
+      summary: ایجاد کاربر
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            example:
+              username: charlie
+              password: password
+              email: charlie@example.com
+              fullName: کاربر چارلی
+              enabled: true
+              scopes: [read, profile]
+      responses:
+        '201':
+          description: ایجاد شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEntity'
+        '403':
+          description: نیاز به scope با نام write
+        '409':
+          description: نام کاربری تکراری است
+
+  /api/users/{id}:
+    get:
+      tags: [کاربران]
+      summary: دریافت کاربر با شناسه
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: جزئیات کاربر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEntity'
+        '404':
+          description: یافت نشد
+    put:
+      tags: [کاربران]
+      summary: به‌روزرسانی کاربر
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: به‌روزرسانی شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEntity'
+        '404':
+          description: یافت نشد
+    delete:
+      tags: [کاربران]
+      summary: حذف کاربر
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: حذف شد
+        '404':
+          description: یافت نشد
+
+  /api/users/{id}/scopes:
+    put:
+      tags: [کاربران]
+      summary: جایگزینی اسکوپ‌های کاربر
+      operationId: replaceUserScopes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scopes]
+              properties:
+                scopes:
+                  type: array
+                  description: نام اسکوپ‌ها
+                  items:
+                    type: string
+            example:
+              scopes: [read, write, profile]
+      responses:
+        '200':
+          description: کاربر به‌روز شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEntity'
+
+  /captcha:
+    get:
+      tags: [احرازهویت]
+      summary: تصویر کپچا (PNG)
+      description: کد کپچا در session ذخیره می‌شود و برای فرم لاگین مرورگر لازم است.
+      operationId: captchaImage
+      responses:
+        '200':
+          description: تصویر PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+
+  /api/auth/verify:
+    post:
+      tags: [احرازهویت]
+      summary: بررسی اعتبارنامه‌ها (محلی یا وب‌سرویس بیرونی)
+      description: |
+        نشست مرورگر نمی‌سازد. از `CredentialVerifier` پیکربندی‌شده
+        (`auth.login.mode=local|remote`) استفاده می‌کند.
+      operationId: verifyCredentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+            example:
+              username: alice
+              password: password
+      responses:
+        '200':
+          description: نتیجه بررسی
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+
+  /oauth/token:
+    post:
+      tags: [OAuth2]
+      summary: دریافت توکن دسترسی
+      description: |
+        endpoint استاندارد OAuth2. کلاینت را با HTTP Basic
+        (`client_id`:`client_secret`) احراز هویت کنید.
+      operationId: token
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type:
+                  type: string
+                  description: نوع grant
+                  enum: [password, authorization_code, refresh_token, client_credentials]
+                username:
+                  type: string
+                  description: نام کاربری (برای password)
+                password:
+                  type: string
+                  description: رمز عبور
+                scope:
+                  type: string
+                  description: اسکوپ‌های درخواستی با فاصله
+                  example: read profile
+                code:
+                  type: string
+                  description: کد authorization
+                redirect_uri:
+                  type: string
+                  description: باید با درخواست authorize یکسان باشد
+                refresh_token:
+                  type: string
+            examples:
+              password:
+                summary: جریان password
+                value:
+                  grant_type: password
+                  username: alice
+                  password: password
+                  scope: read profile
+              authorization_code:
+                summary: تبدیل کد به توکن
+                value:
+                  grant_type: authorization_code
+                  code: YOUR_CODE
+                  redirect_uri: http://localhost:8081/callback
+      responses:
+        '200':
+          description: توکن صادر شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: درخواست نامعتبر / اسکوپ نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
+  /oauth/authorize:
+    get:
+      tags: [OAuth2]
+      summary: شروع جریان authorization_code
+      description: endpoint مرورگر. به لاگین و سپس صفحه رضایت‌نامه هدایت می‌شود.
+      operationId: authorize
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          description: باید برابر code باشد
+          schema:
+            type: string
+            enum: [code]
+        - name: client_id
+          in: query
+          required: true
+          description: شناسه کلاینت OAuth
+          schema:
+            type: string
+            example: web-client
+        - name: redirect_uri
+          in: query
+          required: true
+          description: آدرس بازگشت پس از تأیید
+          schema:
+            type: string
+            example: http://localhost:8081/callback
+        - name: scope
+          in: query
+          description: اسکوپ‌های درخواستی
+          schema:
+            type: string
+            example: read write profile email
+        - name: state
+          in: query
+          description: مقدار دلخواه برای جلوگیری از CSRF
+          schema:
+            type: string
+      responses:
+        '302':
+          description: هدایت به لاگین، رضایت‌نامه، یا redirect_uri همراه با code
+
+  /api/me:
+    get:
+      tags: [پروفایل]
+      summary: پروفایل کاربر جاری
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: پروفایل
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/me/scopes:
+    get:
+      tags: [پروفایل]
+      summary: اسکوپ‌های مجاز کاربر جاری
+      operationId: myScopes
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: لیست اسکوپ‌های مجاز
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScopeEntity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/tokens/me:
+    get:
+      tags: [توکن‌ها]
+      summary: فهرست توکن‌های صادرشده برای کاربر جاری
+      operationId: listMyTokens
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: activeOnly
+          in: query
+          description: فقط توکن‌های فعال و ابطال‌نشده
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: ورودی‌های رجیستری توکن
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TokenRegistryView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/tokens/user/{username}:
+    get:
+      tags: [توکن‌ها]
+      summary: فهرست توکن‌های یک کاربر (نیاز به write)
+      operationId: listUserTokens
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: نام کاربری
+          schema:
+            type: string
+      responses:
+        '200':
+          description: لیست توکن‌ها
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TokenRegistryView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: scope با نام write وجود ندارد
+
+  /api/tokens/revoke/{jti}:
+    post:
+      tags: [توکن‌ها]
+      summary: ابطال توکن با jti
+      description: |
+        در هدر `Authorization` باید **access_token** کامل بفرستید.
+        مقدار `jti` فقط در مسیر URL قرار می‌گیرد.
+      operationId: revokeByJti
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jti
+          in: path
+          required: true
+          description: شناسه یکتای توکن (jti)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: نتیجه ابطال
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokeJtiResponse'
+        '403':
+          description: امکان ابطال توکن کاربر دیگر وجود ندارد
+        '404':
+          description: توکن یافت نشد
+
+  /api/tokens/revoke:
+    post:
+      tags: [توکن‌ها]
+      summary: ابطال با مقدار خام access token
+      operationId: revokeByValue
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: مقدار access token (اختیاری اگر هدر Authorization باشد)
+      responses:
+        '200':
+          description: نتیجه ابطال
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revoked:
+                    type: boolean
+                    description: آیا ابطال انجام شد
+
+  /api/tokens/revoke-all:
+    post:
+      tags: [توکن‌ها]
+      summary: ابطال همه توکن‌های کاربر جاری
+      operationId: revokeAll
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: تعداد توکن‌های ابطال‌شده
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+                    description: نام کاربری
+                  revokedCount:
+                    type: integer
+                    description: تعداد ابطال‌ها
+
+  /api/consent:
+    get:
+      tags: [رضایت‌نامه]
+      summary: اسکوپ‌های در انتظار تأیید (session)
+      description: نیاز به session مرورگر که با `/oauth/authorize` شروع شده باشد.
+      operationId: pendingConsent
+      responses:
+        '200':
+          description: اطلاعات رضایت‌نامه
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentView'
+        '400':
+          description: درخواست authorization در انتظار وجود ندارد
+    post:
+      tags: [رضایت‌نامه]
+      summary: تأیید اسکوپ‌های انتخاب‌شده (JSON)
+      operationId: approveConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentApproveRequest'
+            example:
+              approved: true
+              scopes: [read, profile]
+      responses:
+        '302':
+          description: ادامه `/oauth/authorize` با پارامترهای تأیید
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: توکن دسترسی از `/oauth/token` (برای CRUD به scope با نام write نیاز است)
+    basicAuth:
+      type: http
+      scheme: basic
+      description: شناسه و رمز کلاینت OAuth
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      description: شناسه عددی رکورد
+      schema:
+        type: integer
+        format: int64
+  responses:
+    Unauthorized:
+      description: توکن موجود نیست، نامعتبر است یا ابطال شده
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OAuthError'
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: وضعیت سرویس
+        service:
+          type: string
+          description: نام سرویس
+    AuthModeResponse:
+      type: object
+      properties:
+        mode:
+          type: string
+          description: حالت لاگین
+          enum: [local, remote]
+        captchaEnabled:
+          type: boolean
+          description: آیا کپچا فعال است
+    ScopeView:
+      type: object
+      properties:
+        name:
+          type: string
+          description: نام اسکوپ
+        displayName:
+          type: string
+          description: عنوان نمایشی
+        description:
+          type: string
+          description: توضیح
+    ScopeEntity:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: شناسه
+        name:
+          type: string
+          description: نام اسکوپ
+        displayName:
+          type: string
+          description: عنوان نمایشی
+        description:
+          type: string
+          description: توضیح
+        active:
+          type: boolean
+          description: فعال بودن
+    CreateScopeRequest:
+      type: object
+      required: [name, displayName]
+      properties:
+        name:
+          type: string
+          description: نام یکتای اسکوپ
+        displayName:
+          type: string
+          description: عنوان فارسی/نمایشی
+        description:
+          type: string
+          description: توضیح
+        active:
+          type: boolean
+          default: true
+          description: فعال بودن
+    UpdateScopeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: نام اسکوپ
+        displayName:
+          type: string
+          description: عنوان نمایشی
+        description:
+          type: string
+          description: توضیح
+        active:
+          type: boolean
+          description: فعال بودن
+    UserEntity:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: شناسه کاربر
+        username:
+          type: string
+          description: نام کاربری
+        email:
+          type: string
+          description: ایمیل
+        fullName:
+          type: string
+          description: نام کامل
+        enabled:
+          type: boolean
+          description: فعال بودن حساب
+        accountNonExpired:
+          type: boolean
+          description: منقضی نبودن حساب
+        accountNonLocked:
+          type: boolean
+          description: قفل نبودن حساب
+        credentialsNonExpired:
+          type: boolean
+          description: منقضی نبودن اعتبارنامه
+        createdAt:
+          type: string
+          format: date-time
+          description: زمان ایجاد
+        scopes:
+          type: array
+          description: اسکوپ‌های مجاز
+          items:
+            type: string
+    CreateUserRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: نام کاربری
+        password:
+          type: string
+          format: password
+          description: رمز عبور خام (در سرور hash می‌شود)
+        email:
+          type: string
+          description: ایمیل
+        fullName:
+          type: string
+          description: نام کامل
+        enabled:
+          type: boolean
+          default: true
+          description: فعال بودن
+        scopes:
+          type: array
+          description: لیست نام اسکوپ‌ها
+          items:
+            type: string
+    UpdateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: نام کاربری
+        password:
+          type: string
+          format: password
+          description: در صورت ارسال، رمز دوباره encode می‌شود
+        email:
+          type: string
+          description: ایمیل
+        fullName:
+          type: string
+          description: نام کامل
+        enabled:
+          type: boolean
+          description: فعال بودن
+        accountNonLocked:
+          type: boolean
+          description: قفل نبودن
+        accountNonExpired:
+          type: boolean
+          description: منقضی نبودن حساب
+        credentialsNonExpired:
+          type: boolean
+          description: منقضی نبودن اعتبارنامه
+        scopes:
+          type: array
+          description: اسکوپ‌ها
+          items:
+            type: string
+    VerifyRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: نام کاربری
+        password:
+          type: string
+          description: رمز عبور
+    VerifyResponse:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+          description: نتیجه احراز هویت
+        mode:
+          type: string
+          description: حالت local یا remote
+        username:
+          type: string
+          description: نام کاربری
+        enabled:
+          type: boolean
+          description: فعال بودن کاربر
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: توکن دسترسی JWT
+        token_type:
+          type: string
+          example: bearer
+          description: نوع توکن
+        refresh_token:
+          type: string
+          description: توکن تازه‌سازی
+        expires_in:
+          type: integer
+          description: اعتبار به ثانیه
+        scope:
+          type: string
+          description: اسکوپ‌های اعطاشده
+        jti:
+          type: string
+          description: شناسه یکتای توکن
+        user_id:
+          type: integer
+          description: شناسه کاربر
+        full_name:
+          type: string
+          description: نام کامل
+        email:
+          type: string
+          description: ایمیل
+    OAuthError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: کد خطا
+        error_description:
+          type: string
+          description: توضیح خطا
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: شناسه
+        username:
+          type: string
+          description: نام کاربری
+        email:
+          type: string
+          description: ایمیل
+        fullName:
+          type: string
+          description: نام کامل
+        allowedScopes:
+          type: array
+          description: اسکوپ‌های مجاز در دیتابیس
+          items:
+            type: string
+        tokenScopes:
+          type: array
+          description: اسکوپ‌های داخل توکن جاری
+          items:
+            type: string
+        clientId:
+          type: string
+          description: کلاینت صادرکننده توکن
+    TokenRegistryView:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: شناسه رجیستری
+        jti:
+          type: string
+          description: شناسه توکن
+        tokenType:
+          type: string
+          description: نوع توکن
+        username:
+          type: string
+          description: نام کاربری
+        clientId:
+          type: string
+          description: شناسه کلاینت
+        scopes:
+          type: string
+          description: اسکوپ‌ها
+        issuedAt:
+          type: string
+          format: date-time
+          description: زمان صدور
+        expiresAt:
+          type: string
+          format: date-time
+          description: زمان انقضا
+        revoked:
+          type: boolean
+          description: ابطال شده؟
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: زمان ابطال
+        active:
+          type: boolean
+          description: فعال بودن
+    RevokeJtiResponse:
+      type: object
+      properties:
+        jti:
+          type: string
+          description: شناسه توکن
+        revoked:
+          type: boolean
+          description: نتیجه ابطال
+    ConsentView:
+      type: object
+      properties:
+        clientId:
+          type: string
+          description: کلاینت درخواست‌کننده
+        username:
+          type: string
+          description: کاربر
+        scopes:
+          type: array
+          description: اسکوپ‌های قابل انتخاب
+          items:
+            $ref: '#/components/schemas/ScopeView'
+        approveUrl:
+          type: string
+          description: آدرس تأیید
+    ConsentApproveRequest:
+      type: object
+      properties:
+        approved:
+          type: boolean
+          default: true
+          description: تأیید یا رد
+        scopes:
+          type: array
+          description: اسکوپ‌های انتخاب‌شده
+          items:
+            type: string

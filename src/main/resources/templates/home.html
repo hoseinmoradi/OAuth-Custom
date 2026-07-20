@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>خانه | Master OAuth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+</head>
+<body>
+<div class="atmosphere" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="grid-fade"></div>
+</div>
+
+<main class="shell">
+    <section class="auth-card wide" data-animate="rise">
+        <header class="auth-header">
+            <p class="brand">Master OAuth</p>
+            <h1>ورود موفق</h1>
+            <p class="lead">
+                خوش آمدید
+                <strong th:text="${username}">user</strong>.
+                برای صدور توکن باید جریان OAuth را با یک کلاینت شروع کنید.
+            </p>
+        </header>
+
+        <div class="scope-list">
+            <a class="scope-item" style="text-decoration:none;color:inherit"
+               th:href="@{/oauth/authorize(response_type='code',client_id='web-client',redirect_uri='http://localhost:8081/callback',scope='read write profile email',state='demo')}">
+                <span class="scope-body">
+                    <span class="scope-title"><strong>شروع Authorization Code</strong><code>web-client</code></span>
+                    <small>صفحه انتخاب scope و سپس دریافت code</small>
+                </span>
+            </a>
+            <a class="scope-item" style="text-decoration:none;color:inherit" href="/docs">
+                <span class="scope-body">
+                    <span class="scope-title"><strong>مستندات API</strong><code>/docs</code></span>
+                    <small>Redoc — وب‌سرویس‌ها و OAuth</small>
+                </span>
+            </a>
+            <a class="scope-item" style="text-decoration:none;color:inherit" th:href="@{/guide}">
+                <span class="scope-body">
+                    <span class="scope-title"><strong>راهنمای کاربری</strong><code>/guide</code></span>
+                    <small>آموزش قدم‌به‌قدم استفاده از پلتفرم</small>
+                </span>
+            </a>
+        </div>
+
+        <div class="actions" style="margin-top:1.25rem">
+            <a class="btn-primary" style="text-decoration:none;display:inline-block"
+               th:href="@{/oauth/authorize(response_type='code',client_id='web-client',redirect_uri='http://localhost:8081/callback',scope='read write profile email',state='demo')}">
+                ادامه با انتخاب Scope
+            </a>
+            <a class="btn-ghost" style="text-decoration:none;display:inline-block" href="/logout">خروج</a>
+        </div>
+    </section>
+</main>
+</body>
+</html>

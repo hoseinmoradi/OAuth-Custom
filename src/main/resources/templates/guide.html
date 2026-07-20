@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>راهنمای استفاده | Master OAuth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+</head>
+<body class="guide-page">
+<div class="atmosphere" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="grid-fade"></div>
+</div>
+
+<header class="guide-topbar">
+    <a class="brand-link" th:href="@{/login}">Master OAuth</a>
+    <nav class="guide-top-nav">
+        <a th:href="@{/login}">ورود</a>
+        <a th:href="@{/docs}">مستندات API</a>
+        <a th:href="@{/api/public/health}">سلامت سرویس</a>
+    </nav>
+</header>
+
+<main class="guide-layout">
+    <aside class="guide-toc auth-card">
+        <p class="brand">فهرست</p>
+        <nav>
+            <a href="#intro">معرفی پلتفرم</a>
+            <a href="#login">ورود و کپچا</a>
+            <a href="#auth-code">جریان Authorization Code</a>
+            <a href="#password-grant">گرفتن توکن با Password</a>
+            <a href="#use-token">استفاده از توکن</a>
+            <a href="#revoke">ابطال توکن</a>
+            <a href="#crud">مدیریت کاربر و Scope</a>
+            <a href="#links">لینک‌های مهم</a>
+            <a href="#faq">خطاهای رایج</a>
+        </nav>
+    </aside>
+
+    <article class="guide-content auth-card wide" data-animate="rise">
+        <header class="auth-header">
+            <p class="brand">راهنمای کاربری</p>
+            <h1>چگونه از Master OAuth استفاده کنیم؟</h1>
+            <p class="lead">
+                این صفحه قدم‌به‌قدم توضیح می‌دهد چطور وارد شوید، scope انتخاب کنید،
+                توکن بگیرید، API صدا بزنید و توکن را ابطال کنید.
+                آدرس پایه فعلی:
+                <code th:text="${baseUrl}">http://localhost:8089</code>
+            </p>
+        </header>
+
+        <section id="intro" class="guide-section">
+            <h2>۱. معرفی پلتفرم</h2>
+            <p>
+                Master OAuth یک <strong>Authorization Server</strong> است. کاربرد اصلی‌اش این است که
+                پس از احراز هویت کاربر، یک <strong>JWT Access Token</strong> با scopeهای تأییدشده صادر کند
+                تا سایر سرویس‌ها بتوانند با هدر
+                <code>Authorization: Bearer ...</code>
+                به APIها دسترسی داشته باشند.
+            </p>
+            <ul>
+                <li>لاگین مرورگر با کپچا</li>
+                <li>صفحه انتخاب scope (Consent)</li>
+                <li>صدور / لیست / ابطال توکن</li>
+                <li>CRUD کاربران و Scopeها</li>
+                <li>مستندات تعاملی Redoc در <code>/docs</code></li>
+            </ul>
+        </section>
+
+        <section id="login" class="guide-section">
+            <h2>۲. ورود از صفحه لاگین</h2>
+            <ol>
+                <li>به <a th:href="@{/login}">صفحه ورود</a> بروید.</li>
+                <li>نام کاربری و رمز را وارد کنید.</li>
+                <li>کد تصویر کپچا را وارد کنید؛ در صورت نیاز روی تصویر کلیک کنید تا عوض شود.</li>
+                <li>پس از ورود موفق به صفحه <code>/home</code> می‌روید.</li>
+            </ol>
+            <div class="alert alert-ok">
+                اگر مستقیماً فقط لاگین کنید و به <code>/oauth/authorize</code> بدون
+                <code>client_id</code> بروید، خطای <code>invalid_client</code> می‌گیرید.
+                برای صدور توکن حتماً جریان OAuth را با لینک کامل authorize شروع کنید.
+            </div>
+        </section>
+
+        <section id="auth-code" class="guide-section">
+            <h2>۳. جریان Authorization Code (پیشنهادی برای وب)</h2>
+            <ol>
+                <li>
+                    این لینک را در مرورگر باز کنید (اگر لاگین نیستید، اول لاگین + کپچا می‌آید).
+                    در آدرس زیر <code>HOST</code> را با پایه بالا عوض کنید:
+                    <pre class="guide-code" dir="ltr">HOST/oauth/authorize?response_type=code&amp;client_id=web-client&amp;redirect_uri=http://localhost:8081/callback&amp;scope=read%20write%20profile%20email&amp;state=demo</pre>
+                    نمونه آماده:
+                    <pre class="guide-code" dir="ltr"><span th:text="${baseUrl}">http://localhost:8089</span>/oauth/authorize?response_type=code&amp;client_id=web-client&amp;redirect_uri=http://localhost:8081/callback&amp;scope=read%20write%20profile%20email&amp;state=demo</pre>
+                </li>
+                <li>در صفحه Consent فقط scopeهایی که برای کاربر مجاز است نمایش داده می‌شود؛ موارد دلخواه را انتخاب و تأیید کنید.</li>
+                <li>
+                    مرورگر به آدرسی شبیه این هدایت می‌شود:
+                    <pre class="guide-code" dir="ltr">http://localhost:8081/callback?code=XXXXXX&amp;state=demo</pre>
+                    مقدار <code>code</code> را کپی کنید (یک‌بارمصرف و کوتاه‌عمر است).
+                </li>
+                <li>
+                    بلافاصله کد را به توکن تبدیل کنید:
+                    <pre class="guide-code" dir="ltr">curl -u web-client:password \
+  -d "grant_type=authorization_code" \
+  -d "code=CODE" \
+  -d "redirect_uri=http://localhost:8081/callback" \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/oauth/token</pre>
+                </li>
+                <li>
+                    در پاسخ JSON این فیلدها مهم‌اند:
+                    <ul>
+                        <li><code>access_token</code> — برای هدر Authorization</li>
+                        <li><code>jti</code> — شناسه توکن برای ابطال</li>
+                        <li><code>scope</code> — scopeهای واقعی داخل توکن</li>
+                        <li><code>refresh_token</code> — تمدید توکن</li>
+                    </ul>
+                </li>
+            </ol>
+            <p>
+                از صفحه خانه هم می‌توانید دکمه «ادامه با انتخاب Scope» را بزنید تا همین جریان شروع شود.
+            </p>
+        </section>
+
+        <section id="password-grant" class="guide-section">
+            <h2>۴. گرفتن توکن سریع (Password Grant)</h2>
+            <p>برای تست API بدون مرورگر:</p>
+            <pre class="guide-code" dir="ltr">curl -u api-client:password \
+  -d "grant_type=password&amp;username=alice&amp;password=password&amp;scope=read write profile" \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/oauth/token</pre>
+            <div class="alert alert-error">
+                توجه: حتی اگر در درخواست <code>write</code> بفرستید، فقط scopeهایی که هم در کلاینت و هم در کاربر مجاز باشند وارد توکن می‌شوند.
+                مثلاً کاربری که فقط <code>read</code> دارد نمی‌تواند <code>write</code> بگیرد.
+            </div>
+        </section>
+
+        <section id="use-token" class="guide-section">
+            <h2>۵. استفاده از Access Token</h2>
+            <p>توکن را در هدر بفرستید (نه jti):</p>
+            <pre class="guide-code" dir="ltr">curl -H "Authorization: Bearer ACCESS_TOKEN" \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/api/me</pre>
+            <p>نمونه‌های دیگر:</p>
+            <pre class="guide-code" dir="ltr"># پروفایل و اسکوپ‌های من
+curl -H "Authorization: Bearer ACCESS_TOKEN" <span th:text="${baseUrl}">http://localhost:8089</span>/api/me/scopes
+
+# فهرست توکن‌های من
+curl -H "Authorization: Bearer ACCESS_TOKEN" <span th:text="${baseUrl}">http://localhost:8089</span>/api/tokens/me</pre>
+        </section>
+
+        <section id="revoke" class="guide-section">
+            <h2>۶. ابطال توکن (Revoke)</h2>
+            <p>
+                برای ابطال، در URL مقدار <code>jti</code> را بگذارید و در هدر همان
+                <code>access_token</code> معتبر را بفرستید:
+            </p>
+            <pre class="guide-code" dir="ltr">curl -X POST \
+  -H "Authorization: Bearer ACCESS_TOKEN" \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/api/tokens/revoke/JTI_VALUE</pre>
+            <p>ابطال همه توکن‌های کاربر جاری:</p>
+            <pre class="guide-code" dir="ltr">curl -X POST -H "Authorization: Bearer ACCESS_TOKEN" \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/api/tokens/revoke-all</pre>
+            <p>بعد از ابطال، همان توکن با پیام <code>Token has been revoked</code> رد می‌شود.</p>
+        </section>
+
+        <section id="crud" class="guide-section">
+            <h2>۷. مدیریت کاربران و Scope (CRUD)</h2>
+            <p>نیاز به توکن دارای scope <code>write</code>:</p>
+            <pre class="guide-code" dir="ltr"># 1) گرفتن توکن
+curl -u api-client:password \
+  -d "grant_type=password&amp;username=alice&amp;password=password&amp;scope=read write" \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/oauth/token
+
+# 2) ایجاد کاربر (ACCESS_TOKEN را از پاسخ بالا بگذارید)
+curl -X POST -H "Authorization: Bearer ACCESS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"username":"charlie","password":"password","scopes":["read","profile"]}' \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/api/users
+
+# 3) ایجاد scope
+curl -X POST -H "Authorization: Bearer ACCESS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"reports","displayName":"گزارش‌ها","description":"دسترسی گزارش"}' \
+  <span th:text="${baseUrl}">http://localhost:8089</span>/api/scopes
+
+# 4) فهرست کاربران
+curl -H "Authorization: Bearer ACCESS_TOKEN" <span th:text="${baseUrl}">http://localhost:8089</span>/api/users</pre>
+            <p>
+                فهرست عمومی scopeها بدون توکن:
+                <a th:href="@{/api/scopes}" target="_blank"><code>/api/scopes</code></a>
+            </p>
+        </section>
+
+        <section id="links" class="guide-section">
+            <h2>۸. لینک‌های مهم</h2>
+            <ul class="guide-links">
+                <li><a th:href="@{/login}">ورود</a></li>
+                <li><a th:href="@{/home}">خانه (بعد از لاگین)</a></li>
+                <li><a th:href="@{/docs}" target="_blank">مستندات Redoc</a></li>
+                <li><a th:href="@{/openapi.yaml}" target="_blank">فایل OpenAPI YAML</a></li>
+                <li><a th:href="@{/api/public/health}" target="_blank">Health Check</a></li>
+                <li><a th:href="@{/api/public/auth-mode}" target="_blank">حالت لاگین / کپچا</a></li>
+            </ul>
+        </section>
+
+        <section id="faq" class="guide-section">
+            <h2>۹. خطاهای رایج</h2>
+            <div class="guide-table-wrap">
+                <table>
+                    <thead>
+                    <tr><th>خطا</th><th>علت معمول</th><th>راه‌حل</th></tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><code>invalid_client</code></td>
+                        <td>authorize بدون client_id یا secret اشتباه</td>
+                        <td>لینک کامل authorize یا <code>web-client:password</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>invalid_grant</code></td>
+                        <td>کد منقضی یا دوبار مصرف شده</td>
+                        <td>دوباره authorize کنید و سریع code را عوض کنید</td>
+                    </tr>
+                    <tr>
+                        <td><code>Cannot convert access token to JSON</code></td>
+                        <td>در هدر Bearer مقدار jti یا توکن ناقص گذاشته‌اید</td>
+                        <td>کل <code>access_token</code> را در هدر بگذارید</td>
+                    </tr>
+                    <tr>
+                        <td><code>Token has been revoked</code></td>
+                        <td>توکن ابطال شده</td>
+                        <td>توکن جدید بگیرید</td>
+                    </tr>
+                    <tr>
+                        <td>کپچا نامعتبر</td>
+                        <td>کد اشتباه یا منقضی</td>
+                        <td>تصویر را تازه کنید و دوباره وارد کنید</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="actions" style="margin-top: 1.5rem">
+            <a class="btn-primary" style="text-decoration:none;display:inline-block" th:href="@{/login}">بازگشت به ورود</a>
+            <a class="btn-ghost" style="text-decoration:none;display:inline-block" th:href="@{/docs}">مشاهده Redoc</a>
+        </div>
+    </article>
+</main>
+</body>
+</html>
